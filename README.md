@@ -1,174 +1,268 @@
-<!-- badges -->
-[![License](https://img.shields.io/github/license/huanweide/codehealth-loop)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/huanweide/codehealth-loop)](https://github.com/huanweide/codehealth-loop/stargazers)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![Deps](https://img.shields.io/badge/deps-zero--stdlib-4ecca3)](https://github.com/huanweide/codehealth-loop)
-[![Powered by](https://img.shields.io/badge/powered%20by-maxloop--overlord-ef4444)](https://github.com/huanweide/maxloop-overlord)
-<!-- /badges -->
+<p align="center">
+  <img src="assets/banner.svg" alt="codehealth-loop · 工程健康自愈引擎" width="1280">
+</p>
 
-# codehealth-loop · 工程健康自愈引擎（Panoptes）
+# 🔁 codehealth-loop · 工程健康自愈引擎
 
-> **English TL;DR:** A *self-healing* engineering-health engine. It fuses a brake-driven iteration core (from `maxloop-overlord`), a 12-axis perception layer (from the `doctors` family), a 7-mind adversarial review matrix (from `advverify`), and a destructive-command guardrail (from `forge-safeguard`) into **one systematic loop** that refuses to declare "done" until every health axis is genuinely green — no fake-green, no self-spin.
+![License](https://img.shields.io/github/license/huanweide/codehealth-loop)
+![Stars](https://img.shields.io/github/stars/huanweide/codehealth-loop)
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
+![Deps](https://img.shields.io/badge/deps-zero--stdlib-4ecca3)
+![Powered by](https://img.shields.io/badge/powered%20by-maxloop--overlord-ef4444)
+![CI](https://github.com/huanweide/codehealth-loop/actions/workflows/ci.yml/badge.svg)
 
-> **它不是又一个 linter。** 它是把"写代码→假绿→上线→爆雷"的死循环，换成"写代码→多轴体检→对抗评审→带刹车迭代→真达标才交付"的自愈闭环。
+> **English TL;DR** — A *self-healing* engineering-health engine. It fuses the **brake-driven iteration core** of [`maxloop-overlord`](https://github.com/huanweide/maxloop-overlord) (external-judgement brakes, no fake-green), a **12-axis perception layer** ported from [`doctors`](https://github.com/huanweide/doctors), and a **sandbox-verified healer** into one systematic loop that refuses to declare "done" until every health axis is genuinely green. Zero third-party dependencies, stdlib only.
 
----
+> **它不是又一个 linter。** 它是把「写代码 → 假绿 → 上线 → 爆雷」的死循环，换成「多轴体检 → 根因收敛 → 带刹车迭代 → 沙箱验证修复 → 真达标才交付」的自愈闭环。
 
-## 为什么需要它（痛点）
+**任意代码仓库 → 自动完成「12 轴体检 → 红点收敛成根因 → 四道刹车迭代 → 沙箱验证修复 → 真达标交付」**
 
-AI 写得动代码，但有三个系统性毛病：
-
-1. **假绿（fake-green）**：测试过了、能跑了，但圈复杂度爆表、重复代码成灾、藏着 `eval` 注入面 —— "能跑" ≠ "该上线"。
-2. **没有收敛标准**：改到什么时候算好？全是凭感觉。
-3. **空转（self-spin）**：来回改、越改越乱，没人喊停。
-
-`codehealth-loop` 把四件真实武器熔成一条流水线来治这三个毛病：
-
-| 你已有的能力 | 在引擎里的角色 | 来源仓库 |
-|---|---|---|
-| 带刹车的迭代引擎（四道刹车） | **BrakeCore 刹车内核** | [`maxloop-overlord`](https://github.com/huanweide/maxloop-overlord) |
-| 12 个零依赖代码健康轴 | **PerceptionLayer 感知层** | [`doctors` 家族](https://github.com/huanweide/doctors) |
-| 7 思维模型对抗评审 | **AdversarialMatrix 评审矩阵** | [`advverify`](https://github.com/huanweide/advverify) |
-| 破坏性命令拦截护栏 | **GuardrailLayer 护栏层** | [`forge-safeguard`](https://github.com/huanweide/forge-safeguard) |
-
-> 这就是「合成大西瓜」：**不重新发明轮子，把散落的 4 个项目按一套系统化架构重新编排**。
+[30 秒看懂](#-30-秒看懂) · [它能做什么](#-它能做什么) · [特性](#-特性) · [快速开始](#-快速开始) · [CLI 速查](#-cli-速查) · [架构](#-架构) · [诚实标注](#-已实现-vs-路线图诚实标注) · [相关项目](#-相关项目)
 
 ---
 
-## 架构（系统化概念路线）
+## 🔁 30 秒看懂
 
-```mermaid
-flowchart TB
-    subgraph PL["PerceptionLayer · 感知层 (12 Health Axes · 全部已落地)"]
-        A0[1 RepoDoctor 仓库卫生]
-        A1[2 CommitDoctor 提交规范]
-        A2[3 DevDoctor 依赖·密钥·许可证]
-        A3[4 CycScan 圈复杂度]
-        A4[5 DocDoctor 文档健康]
-        A5[6 PkgDoctor 包元数据]
-        A6[7 SecScan 安全反模式]
-        A7[8 RelDoctor 发布卫生]
-        A8[9 DupScan 重复代码]
-        A9[10 TypeDoctor 类型纪律]
-        A10[11 A11yDoctor 可访问性]
-        A11[12 EngHealth 过程成熟度]
-    end
-    subgraph AM["AdversarialMatrix · 评审矩阵 (7-Mind Collision)"]
-        B1[Munger / Musk / Feynman / Taleb / Zhang / Linus / Carmack]
-    end
-    subgraph BC["BrakeCore · 刹车内核 (maxloop four brakes)"]
-        C1[R/C/N + 根因闸门]
-        C2[Oracle Gate + 证据锚点]
-        C3[判别测试 · 旧红新绿]
-    end
-    subgraph GL["GuardrailLayer · 护栏层"]
-        D1[破坏性命令拦截]
-    end
-    subgraph CP["ConvergenceProtocol · 收敛协议"]
-        E1[逃逸阶梯]
-        E2[stall guard 防空转]
-    end
+```text
+普通体检：health = 78 分，2 个 warning          ← 数字好看，没人知道改没改到位
+          AI 说"已优化"，测试过了，能跑了      ← 但 eval 还在、复杂度还爆表
 
-    IN[代码仓库] --> PL --> AM --> BC
-    GL -. 保护 .- BC
-    BC -->|未达标| CP
-    CP -->|再迭代| IN
-    BC -->|全绿 + 判别测试通过| OUT[真达标交付 · 证据报告]
+codehealth-loop：
+  轴 7  SecScan   RED  src/app.py:12  命中 eval（high）
+        ↓ 根因闸门：R（非改不可）—— 危险调用真实存在，带 file:line 证据
+        ↓ Healer：在沙箱副本上移除该调用 → 重跑 SecScan → 0 hits
+        ↓ 判别测试：旧版必红 / 新版必绿 → verified_green
+        ↓ 交付：修复补丁 + 证据，绝不自动改你的代码
 ```
 
-**四道刹车（BrakeCore，源自 maxloop）是灵魂：**
-1. **R/C/N + 根因闸门** —— 每轮先把红轴收敛成带 `file:line` 证据的根因，不靠感觉。
-2. **Oracle Gate + 证据锚点** —— 没有真实判据输出，就不许声称通过。
-3. **判别测试（旧红新绿）** —— 上一轮红、这一轮才绿，才算真进步。
-4. **逃逸阶梯 + stall guard** —— 卡住就升级策略；连续 N 轮无改善，立即刹车交给人，不空转。
+差别只有一句话：**"能跑" ≠ "该上线"；放行的判据来自引擎之外，不来自模型自述。**
 
 ---
 
-## 安装
+## 🔁 它能做什么
+
+### 真实运行 1：引擎对**自己**跑闭环（`python engine.py .`）
+
+```text
+── Round 1 · health=95 · strategy=standard ──
+── Round 2 · health=95 · strategy=standard ──
+── Round 3 · health=95 · strategy=standard ──
+
+════════ DELIVERY (evidence-anchored) ══════
+{
+  "round": 4,
+  "health_score": 95,
+  "verdict": "STALL GUARD tripped — stop self-spin, report to human",
+  "strategy": "deepen: widen scan scope + lower noise threshold",
+  "axes": [
+    {"name":"SecScan","axis":7,"passed":true,"score":100,
+     "evidence":"scanned 16 files, 0 hits (0 high)"},
+    {"name":"CycScan","axis":4,"passed":true,"score":100,
+     "evidence":"scanned 16 files, 0 funcs over threshold(>12)"},
+    {"name":"EngHealth","axis":12,"passed":true,"score":96,
+     "evidence":"EngHealth process signals: LICENSE=y, README=y, CI=y, tests=n"},
+    {"name":"DocDoctor","axis":5,"passed":false,"score":55,
+     "evidence":"DocDoctor scanned 3 Markdown file(s); 3 finding(s)"}
+  ]
+}
+--- fix candidates (sandbox-verified, NOT auto-applied) ---
+  [DocDoctor] architecture.md:57 -> manual (needs human refactor)
+     why: <img> 缺 alt 属性（可访问性/屏幕阅读器）
+  [DocDoctor] README.md:92 -> manual (needs human refactor)
+     why: 裸 URL 未包裹为链接
+```
+
+> 注意最后一行的态度：**引擎没有宣布"全绿"**。剩下几条是文档里的示例片段，无法机械验证，
+> 它就标 `manual` 交给人工、触发 stall guard 停止空转 —— **这才是它和"报个好看分数就完事"的区别**。
+
+### 真实运行 2：判别测试（`python test_engine.py`）
+
+自测在临时目录里造脏/干净样例，**从不扫描本仓源码**，结果稳定可复现：
+
+```text
+[ok] axis registry: 12 axes, numbers [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+[ok] dirty sample CONVERGED; SecScan verified-green in sandbox
+[ok] clean sample ALL GREEN; health=99
+ALL TESTS PASSED
+```
+
+脏样本（带 `eval`）第 1 轮即 `CONVERGED`：`Healer` 在沙箱副本上移除该调用并重跑 `SecScan` 证明变绿 → `verified_green`。
+无机械可验证修复的结构性问题则标 `manual`，**诚实移交人工，不假装修好了**。
+
+---
+
+## 🔁 特性
+
+- **PerceptionLayer 12 轴感知层（零依赖 · 已全落地）** —— `judges/` 下 12 个真实静态探针：`doctors` 移植的 8 轴（Repo / Commit / Dev / Doc / Pkg / Rel / Type / A11y）+ SecScan / CycScan / DupScan 3 轴 + EngHealth 过程成熟度轴。离线、确定性，继承 dogfood 纪律（不误伤字符串 / 注释 / 正则）。
+- **BrakeCore 四道刹车内核（源自 maxloop）** —— R/C/N + 根因闸门、Oracle Gate + 证据锚点、判别测试（旧红新绿）、逃逸阶梯 + stall guard。灵魂就在"判据来自模型之外"。
+- **Healer 沙箱验证层** —— 生成修复候选 → 在**沙箱副本**上重跑该轴 → 证明"确实变绿"才标 `verified_green`；**绝不自动改你的代码**，只交付已证明有效的补丁。
+- **证据锚点交付（evidence-anchored）** —— 每条 finding 带 `file:line` 与真实扫描证据；交付报告是 `json`，可 diff、可复现、可进 CI。
+- **防空转 stall guard** —— 连续 N 轮零改善立即刹车交给人，杜绝"来回改、越改越乱"。
+- **零第三方依赖** —— 只用 Python 标准库，`git clone` 即可跑，无 `pip install`、无网络、无 API Key。
+- **回归自测自带判别测试** —— `test_engine.py` 同时断言「脏样本必须 CONVERGED 且 SecScan 沙箱变绿」与「干净样本必须 ALL GREEN」，和 maxloop 的旧红新绿同构。
+
+---
+
+## 🔁 快速开始
+
+### 安装
 
 零第三方依赖，只要本机有 Python ≥ 3.10：
 
 ```bash
 git clone https://github.com/huanweide/codehealth-loop.git
 cd codehealth-loop
-python engine.py /path/to/your/project
 ```
 
----
-
-## 用法
+### 跑一次自愈闭环
 
 ```bash
-# 对任意项目跑自愈闭环（默认最多 6 轮，带 stall guard）
-python engine.py ./your-project
-
-# 自定义轮数
-python engine.py ./your-project --max-rounds 8
+python engine.py /path/to/your/project          # 默认最多 6 轮，带 stall guard
+python engine.py ./your-project --max-rounds 8  # 自定义轮数
 ```
 
-真实运行示例：引擎对自身源码跑一轮闭环（`python engine.py .`），12 轴全部真实跑通、输出真实证据，并通过判别测试 —— 工具严于律己：
+### 自测（判别测试，本地真绿）
 
-```
-══════ DELIVERY (evidence-anchored) ══════
-{
-  "round": 1,
-  "health_score": 97,
-  "verdict": "ALL GREEN + discrimination test passed",
-  "axes": [
-    {"name":"RepoDoctor","passed":true,"score":100,"evidence":"scanned N files; 0 finding(s); has-license=y; has-readme=y"},
-    {"name":"CommitDoctor","passed":true,"score":100,"evidence":"no git history — commit-message hygiene not applicable (manual)"},
-    {"name":"DevDoctor","passed":true,"score":100,"evidence":"... 0 finding(s); dependency-cycles=MANUAL"},
-    {"name":"CycScan","passed":true,"score":100,"evidence":"scanned N files, 0 funcs over threshold(>12)"},
-    {"name":"DocDoctor","passed":true,"score":90,"evidence":"scanned 1 Markdown file(s); 0 finding(s)"},
-    {"name":"PkgDoctor","passed":true,"score":100,"evidence":"no package.json in scope — axis not applicable"},
-    {"name":"SecScan","passed":true,"score":100,"evidence":"scanned N files, 0 hits (0 high)"},
-    {"name":"RelDoctor","passed":true,"score":100,"evidence":"RelDoctor: version=None; 0 finding(s)"},
-    {"name":"DupScan","passed":true,"score":92,"evidence":"... dup-ratio=0.00% (thresh 5%), 0 dup blocks"},
-    {"name":"TypeDoctor","passed":true,"score":100,"evidence":"scanned 0 TS/JS file(s); 0 type-smell(s)"},
-    {"name":"A11yDoctor","passed":true,"score":100,"evidence":"scanned 0 file(s); 0 a11y finding(s)"},
-    {"name":"EngHealth","passed":true,"score":96,"evidence":"EngHealth process signals: LICENSE=y, README=y, CI=n, tests=n"}
-  ]
-}
+```bash
+python test_engine.py
 ```
 
-> 注入样例（带 `eval` 的脏文件）时，引擎第 1 轮即 `CONVERGED`：`Healer` 在沙箱副本上清空该行并重跑 `SecScan`，证明变绿 → 标 `verified_green` 交付，**绝不自动改你的代码**。无机械可验证修复的结构性问题（如高圈复杂度）则标 `manual` 诚实移交人工。
+真实输出：
 
-> 闭环不是空谈：引擎发现红轴 → `Healer` 生成修复候选 → 在**沙箱副本**上重跑该轴，证明"移除该危险调用确实让轴变绿"（判别测试锁死）→ 交付已验证的修复补丁。**它绝不自动改你的代码**（符合 `forge-safeguard` 安全精神），只把"经证明有效的修复"交给你/上层 agent 落地。若无可机械验证的修复（如高圈复杂度需重构），则标 `manual` 并诚实移交人工。
+```text
+[ok] axis registry: 12 axes, numbers [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+[ok] dirty sample CONVERGED; SecScan verified-green in sandbox
+[ok] clean sample ALL GREEN; health=99
+ALL TESTS PASSED
+```
+
+> 自测自己在临时目录里造脏/干净样例，**从不扫描本仓源码**（dogfood 纪律），因此结果稳定可复现。
 
 ---
 
-## 已实现 vs 路线图（诚实标注）
+## 🔁 CLI 速查
+
+| 命令 | 用途 |
+|---|---|
+| `python engine.py <dir>` | 对指定项目跑自愈闭环（默认最多 6 轮） |
+| `python engine.py <dir> --max-rounds N` | 自定义最大迭代轮数 |
+| `python engine.py .` | 对当前目录（含本仓自身）自检 |
+| `python engine.py --help` | 查看全部参数 |
+| `python test_engine.py` | 回归 + 判别测试（退出码非 0 即失败） |
+
+---
+
+## 🔁 架构
+
+引擎把四件真实武器熔成一条流水线：**感知 → 刹车 → 修复 → 收敛**，四道刹车串成铁链，收敛标准是"外部判据全绿"，不是"模型说好了"。
+
+| 原语 Primitive | 含义 |
+|---|---|
+| **红点 finding** | 带 `file:line` 的具体问题，不是"感觉不好" |
+| **轴 axis** | 一个可插拔的静态探针（12 个，编号 1–12，唯一） |
+| **R/C/N 判定** | R 非改不可 / C 可选项 / N 不该加 —— 必要性与根因闸门 |
+| **判别测试** | 沙箱副本上"旧版必红 / 新版必绿"，证明是改动起的效 |
+| **verified_green** | 修复候选已在沙箱里被重跑证明变绿 |
+| **manual** | 无可机械验证的修复（需重构），诚实移交人工，不假装修好 |
+
+```text
+   代码仓库
+      ↓
+  ① PerceptionLayer 感知层 · 12 轴扫描（judges/）
+      ↓ 红点（file:line + evidence）
+  ② BrakeCore 刹车内核 · R/C/N 根因闸门 + Oracle Gate + 证据锚点
+      ↓ 未达标
+  ③ Healer 修复层 · 生成候选 → 沙箱副本重跑该轴 → 旧红新绿 → verified_green
+      ↓
+  ④ ConvergenceProtocol 收敛协议 · 逃逸阶梯 / stall guard
+      ↓ 全绿 + 判别测试通过
+   交付：DELIVERY json（证据锚定）+ 修复候选（不自动落地）
+```
+
+| 模块 Module | 文件 | 说明 |
+|---|---|---|
+| 感知层 | `engine.py` → `PerceptionLayer` | 发现并调度 `judges/` 下全部 12 个轴 |
+| 刹车内核 | `engine.py` → `BrakeCore` | R/C/N 根因闸门 + Oracle Gate + 证据锚点 |
+| 收敛协议 | `engine.py` → `ConvergenceProtocol` | 逃逸阶梯 + stall guard 防空转 |
+| 主循环 | `engine.py` → `run_loop` / `_round` / `_deliver` | 轮次驱动与 evidence-anchored 交付 |
+| 修复层 | `healer.py` → `propose` / `sandbox_verify_fix` | 沙箱副本验证修复，绝不改用户代码 |
+| 12 个健康轴 | `judges/*.py` | repodoctor / commitdoctor / devdoctor / docdoctor / pkgdoctor / reldoctor / typedoctor / a11ydoctor / secscan / cycscan / dupscan / enghealth |
+| 裁判公共库 | `judges/_common.py` | 扫描、去注释、严重度等共享逻辑 |
+| 回归自测 | `test_engine.py` | 轴注册表 + 脏样本收敛 + 干净样本全绿 |
+
+---
+
+## 🔁 加一个你自己的健康轴
+
+轴是可插拔的：往 `judges/` 丢一个文件，导出 `run(root)` 返回 finding 列表，感知层会自动纳管。
+
+```python
+# judges/myrule.py
+from _common import walk_files, strip_comments
+
+AXIS = 13
+NAME = "MyRule"
+
+def run(root):
+    findings = []
+    for path in walk_files(root, (".py",)):
+        for lineno, line in enumerate(strip_comments(path), start=1):
+            if "TODO(security)" in line:
+                findings.append({
+                    "file": path, "line": lineno,
+                    "severity": "high",
+                    "message": "遗留安全 TODO 未处理",
+                })
+    return findings
+```
+
+感知层要求：**轴编号唯一、名称唯一、每条 finding 必须带 `file:line` 证据** —— `test_engine.py` 会替你把住这道门。
+
+---
+
+## 🔁 已实现 vs 路线图（诚实标注）
 
 | 层 | 状态 | 说明 |
 |---|---|---|
-| BrakeCore 四道刹车 | ✅ 已实现 | `engine.py` 真实跑通 |
-| PerceptionLayer · **全部 12 轴** | ✅ **已实现（本次合成）** | `judges/` 下 12 个真实静态探针：`doctors` 8 轴（Repo/Commit/Dev/Doc/Pkg/Rel/Type/A11y）+ SecScan/CycScan/DupScan 3 轴 + EngHealth 过程轴；零依赖、离线、确定性，继承 dogfood 纪律（不误伤字符串/注释/正则） |
-| **Healer Layer（修复候选 + 沙箱验证）** | ✅ **已实现** | `healer.py`：生成修复候选 → 沙箱副本重跑判据证明变绿 → 交付；绝不自动改用户代码 |
-| AdversarialMatrix 7 视角 | 🔜 接口预留 | 接入 `advverify` 的多视角评审作为 R/C/N 的对抗输入 |
-| GuardrailLayer | 🔜 接口预留 | 接入 `forge-safeguard` 拦截修复时的破坏性命令 |
-| 自动落地修复到用户代码 | ❌ 不提供（安全铁律） | 引擎只交付"经沙箱验证的修复候选"，落地由上层 agent/人执行，二者解耦 |
+| PerceptionLayer · 12 轴 | ✅ 已实现 | `judges/` 下 12 个真实静态探针，零依赖、离线、确定性 |
+| BrakeCore 四道刹车 | ✅ 已实现 | `engine.py` 真实跑通，判别测试由 `test_engine.py` 锁死 |
+| Healer 沙箱验证层 | ✅ 已实现 | `healer.py`：候选 → 沙箱重跑 → `verified_green` |
+| 回归 / 判别测试 | ✅ 已实现 | `test_engine.py`，脏样本与干净样本双向断言 |
+| AdversarialMatrix 7 视角对抗评审 | 🔜 接口预留 | 计划接入 [`advverify`](https://github.com/huanweide/advverify) 的多视角评审作为 R/C/N 对抗输入 |
+| GuardrailLayer 护栏层 | 🔜 接口预留 | 计划接入 [`forge-safeguard-20260812`](https://github.com/huanweide/forge-safeguard-20260812) 拦截破坏性命令 |
+| 自动落地修复到用户代码 | ❌ 不提供（安全铁律） | 只交付"经沙箱验证的修复候选"，落地由人 / 上层 agent 执行 |
 
 ---
 
-## 与兄弟项目的关系
+## 🔁 相关项目
 
-- **maxloop-overlord**：本引擎的 BrakeCore 即其四道刹车的 Python 实现。它是"通用迭代质量引擎"，本仓库是它在"代码健康"这一垂直场景的具象化。
-- **doctors**：本引擎的 PerceptionLayer 来源。它的 8 个零依赖 doctor（`repo/commit/dev/doc/pkg/rel/type/a11y`）检查逻辑已**忠实移植**为 `judges/` 下的 Python 探针（第 1/2/3/5/6/8/10/11 轴）；原散落的 9 个独立叶子仓（cycscan/dupscan/secscan/debtlens/debugdoctor/ghadoctor/litdoctor/enghealth/family-showcase）因已被本引擎覆盖，已**归档**到 `gh-optimizer/_archive/`（可逆，不删除），不再各自 0★ 散落。
-- **advverify / forge-safeguard**：分别提供"对抗评审视角"与"执行护栏"，作为可插拔模块。
+同一套范式（**外部判据刹车 · 杜绝假绿空转 · 四道刹车**）在不同载体的落地，互相导流：
+
+| 项目 | 载体 | 一句话 |
+|---|---|---|
+| [`maxloop-overlord`](https://github.com/huanweide/maxloop-overlord) | Agent Skill | 范式本体：BrakeCore 四道刹车就来自它 |
+| [`codehealth-loop`](https://github.com/huanweide/codehealth-loop) | Python 引擎（本仓库） | 范式在"工程健康"垂直场景的具象化 |
+| [`veriloop`](https://github.com/huanweide/veriloop) | Python CLI | 范式在"代码审计"场景的具象化：12 分析轴 + 4 道验证刹车 |
+| [`overlord-loop`](https://github.com/huanweide/overlord-loop) | 引擎实现 | 魔王系统：带刹车的 AI 代码进化引擎 |
+| [`doctors`](https://github.com/huanweide/doctors) | Node CLI 全家桶 | 本引擎感知层 8 个轴的来源，逻辑已忠实移植为 Python 探针 |
+| [`family-showcase`](https://github.com/huanweide/family-showcase) | 单页 HTML | 工程健康家族 18 轴全景仪表盘 |
 
 ---
 
-## 🧰 同一作者的其他工具
+## 🔁 安全边界
 
-> 作者在做一系列开源效率工具，欢迎顺手点 Star 支持：
+> ⚠️ **它绝不自动改你的代码。**
+> - 修复只在**沙箱副本**上验证，验证通过后作为候选交付，落地由你 / 上层 agent 执行。
+> - 无可机械验证的修复（如高圈复杂度需重构）标 `manual` 移交人工，**不假装修好**。
+> - 零第三方依赖、不联网、不读取任何密钥；扫描只读。
 
-- 📚 长篇创作 — AI 小说工坊，本地规则引擎零依赖：[点此访问](https://github.com/huanweide/novel-smith)
-- 🎓 网课助手 — 智慧树自动播放/续播/AI 答题：[点此访问](https://github.com/huanweide/zhihuishu-helper)
-- 🎬 字幕/视频 — B站字幕一键提取（零 Key 取官方字幕）：[点此访问](https://github.com/huanweide/bili-subtitle-universal)
-- 📺 实时字幕 — 直播/会议实时字幕：[点此访问](https://github.com/huanweide/live-subtitle)
-- ✂️ 视频摘要 — 长视频一键总结：[点此访问](https://github.com/huanweide/video-brief)
-- 🖥️ 总览 — 作者全部开源项目集散：[点此访问](https://github.com/huanweide/family-showcase)
-- 🩺 代码健康 — 零依赖多轴静态体检：[点此访问](https://github.com/huanweide/doctors)
-## License
+## 🔁 License
 
-MIT
+[MIT](LICENSE) © 2026 huanweide
+
+---
+
+<div align="center">
+  <b>如果 codehealth-loop 让你在上线前多抓了一个真问题，点个 ⭐ Star 让更多人看到。</b><br/>
+  <a href="https://github.com/huanweide/codehealth-loop">huanweide/codehealth-loop</a>
+</div>

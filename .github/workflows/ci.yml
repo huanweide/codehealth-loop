@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # 判别测试：脏样本必须 CONVERGED 且 SecScan 沙箱变绿；干净样本必须 ALL GREEN。
+      # 只绿不红不算证明 —— 这正是 maxloop 四道刹车里"判别测试"的落地。
+      - name: 回归 + 判别测试
+        run: python test_engine.py
+
+      - name: 轴注册表完整性（12 轴 · 编号 1..12 唯一）
+        run: |
+          set -e
+          python - <<'PY'
+          import os, sys, tempfile
+          sys.path.insert(0, os.getcwd())
+          import engine
+          res = engine.PerceptionLayer(os.path.join(os.getcwd(), "judges")).sweep(tempfile.mkdtemp())
+          names = [r["name"] for r in res]
+          nums = sorted(r["axis"] for r in res)
+          assert len(names) == 12, f"expected 12 axes, got {len(names)}: {names}"
+          assert nums == list(range(1, 13)), f"axis numbers must be 1..12: {nums}"
+          print(f"[ok] {len(names)} axes registered: {names}")
+          PY
+
+      - name: CLI 冒烟（--max-rounds 必须真实生效）
+        run: |
+          set -e
+          python engine.py --help | grep -q "max-rounds"
+          python engine.py . --max-rounds 1 | grep -q "DELIVERY"
+          echo "OK: CLI 冒烟通过"
+
+      - name: 零第三方依赖（不得 import 任何非标准库）
+        run: |
+          set -e
+          python - <<'PY'
+          import ast, os, sys
+          allowed = set(sys.stdlib_module_names)
+          # 本仓自身的模块（engine / healer / judges/*）算"本地依赖"，不算第三方
+          local = set()
+          for root, dirs, files in os.walk("."):
+              dirs[:] = [d for d in dirs if d not in {".git", "__pycache__", ".github"}]
+              for f in files:
+                  if f.endswith(".py"):
+                      local.add(os.path.splitext(f)[0])
+          bad = []
+          for root, dirs, files in os.walk("."):
+              dirs[:] = [d for d in dirs if d not in {".git", "__pycache__", ".github"}]
+              for f in files:
+                  if not f.endswith(".py"):
+                      continue
+                  p = os.path.join(root, f)
+                  tree = ast.parse(open(p, encoding="utf-8").read(), filename=p)
+                  for node in ast.walk(tree):
+                      if isinstance(node, ast.Import):
+                          for a in node.names:
+                              top = a.name.split(".")[0]
+                              if top not in allowed and top not in local:
+                                  bad.append((p, a.name))
+                      elif isinstance(node, ast.ImportFrom) and node.level == 0:
+                          top = (node.module or "").split(".")[0]
+                          if top not in allowed and top not in local:
+                              bad.append((p, node.module))
+          if bad:
+              print("FAIL: 检出第三方依赖 ->", bad)
+              sys.exit(1)
+          print("OK: 全部 import 均为标准库")
+          PY

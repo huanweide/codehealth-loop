@@ -215,5 +215,11 @@ def _deliver(round_no, health, results, verdict, strategy, causes=None, fixes=No
 
 
 if __name__ == "__main__":
-    target = sys.argv[1] if len(sys.argv) > 1 else "."
-    run_loop(target)
+    import argparse
+    ap = argparse.ArgumentParser(
+        prog="codehealth-loop",
+        description="工程健康自愈引擎：12 轴体检 + 四道刹车 + 沙箱验证修复")
+    ap.add_argument("target", nargs="?", default=".", help="被体检的项目根目录（默认当前目录）")
+    ap.add_argument("--max-rounds", type=int, default=6, help="最大迭代轮数（默认 6）")
+    args = ap.parse_args()
+    run_loop(args.target, max_rounds=args.max_rounds)
