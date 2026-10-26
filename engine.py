@@ -33,6 +33,8 @@ class PerceptionLayer:
     def __init__(self, judges_dir: str):
         self.judges = []
         self.by_name = {}  # axis name -> module (for targeted sandbox re-runs)
+        if judges_dir not in sys.path:
+            sys.path.insert(0, judges_dir)  # so judges can `import _common`
         for fn in sorted(os.listdir(judges_dir)):
             if fn.endswith(".py") and not fn.startswith("_"):
                 spec = importlib.util.spec_from_file_location(
@@ -137,36 +139,51 @@ def run_loop(root: str, max_rounds: int = 6) -> dict:
     brake = BrakeCore()
     conv = ConvergenceProtocol()
     prev = None
+    last = None
     for rnd in range(1, max_rounds + 1):
-        results = percept.sweep(root)
-        health = sum(r["score"] for r in results) // len(results) if results else 0
-        passed, red = brake.oracle_gate(results)
-        strategy = conv.escape_ladder(rnd, brake.escape_after)
-        if passed:
-            if brake.discrimination_test(prev, results):
-                return _deliver(rnd, health, results, "ALL GREEN + discrimination test passed", strategy)
-            prev = results
-            continue
-        causes = brake.root_cause_gate(red)
-        # Healer: propose + sandbox-verify fixes; converge on a *verified* fix
-        # existing (maxloop: change -> test -> converge), never on silent mutation.
-        fixes = healer.propose(red, percept.by_name, root)
-        verified = [f for f in fixes if f.get("verified_green")]
-        if verified:
-            return _deliver(
-                rnd, health, results,
-                f"CONVERGED: {len(verified)} axis(s) proven fixable in sandbox "
-                f"(NOT auto-applied); remaining need manual review",
-                strategy, causes, fixes)
-        stalled = conv.stall_guard(health, brake.stall_patience)
-        if stalled:
-            return _deliver(rnd, health, results, "STALL GUARD tripped — stop self-spin, report to human", strategy, causes, fixes)
-        # not delivered this round: surface evidence-anchored root causes
-        print(f"\n── Round {rnd} · health={health} · strategy={strategy} ──")
-        for c in causes[:12]:
-            print("  •", c)
-        prev = results
-    return _deliver(max_rounds, health, results, "MAX ROUNDS reached — deliver evidence report", strategy, causes, fixes)
+        delivery, cont = _round(rnd, root, percept, brake, conv, prev)
+        if delivery is not None:
+            return delivery
+        last = cont
+        prev = cont["results"]
+    return _deliver(max_rounds, last["health"], last["results"],
+                    "MAX ROUNDS reached — deliver evidence report",
+                    last["strategy"], last["causes"], last["fixes"])
+
+
+def _round(rnd: int, root: str, percept, brake, conv, prev) -> tuple:
+    """One convergence iteration. Returns (delivery_or_None, continuation_state)."""
+    results = percept.sweep(root)
+    health = sum(r["score"] for r in results) // len(results) if results else 0
+    passed, red = brake.oracle_gate(results)
+    strategy = conv.escape_ladder(rnd, brake.escape_after)
+    cont = {"results": results, "red": red, "causes": [], "strategy": strategy,
+            "health": health, "fixes": []}
+    if passed:
+        if brake.discrimination_test(prev, results):
+            return _deliver(rnd, health, results,
+                            "ALL GREEN + discrimination test passed", strategy), None
+        return None, cont
+    causes = brake.root_cause_gate(red)
+    # Healer: propose + sandbox-verify fixes; converge on a *verified* fix
+    # existing (maxloop: change -> test -> converge), never on silent mutation.
+    fixes = healer.propose(red, percept.by_name, root)
+    verified = [f for f in fixes if f.get("verified_green")]
+    if verified:
+        return _deliver(
+            rnd, health, results,
+            f"CONVERGED: {len(verified)} axis(s) proven fixable in sandbox "
+            f"(NOT auto-applied); remaining need manual review",
+            strategy, causes, fixes), None
+    if conv.stall_guard(health, brake.stall_patience):
+        return _deliver(rnd, health, results,
+                        "STALL GUARD tripped — stop self-spin, report to human",
+                        strategy, causes, fixes), None
+    # not delivered this round: surface evidence-anchored root causes
+    print(f"\n── Round {rnd} · health={health} · strategy={strategy} ──")
+    for c in causes[:12]:
+        print("  •", c)
+    return None, {**cont, "causes": causes, "fixes": fixes}
 
 
 def _deliver(round_no, health, results, verdict, strategy, causes=None, fixes=None) -> dict:

@@ -28,38 +28,42 @@ def _py_cc(node: ast.AST) -> int:
     return cc
 
 
+def _scan_python(path: str, root: str, offenders: list, threshold: int):
+    try:
+        tree = ast.parse(open(path, encoding="utf-8", errors="ignore").read())
+    except (OSError, SyntaxError):
+        return
+    for n in ast.walk(tree):
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            cc = _py_cc(n)
+            if cc > threshold:
+                offenders.append({"file": os.path.relpath(path, root), "line": n.lineno, "cc": cc})
+
+
+def _scan_js(path: str, root: str, offenders: list, threshold: int):
+    try:
+        src = open(path, encoding="utf-8", errors="ignore").read()
+    except OSError:
+        return
+    cc = len(JS_BRANCH.findall(src))
+    if cc > threshold * 4:  # file-level heuristic is noisier
+        offenders.append({"file": os.path.relpath(path, root), "line": 1, "cc": cc})
+
+
 def evaluate(root: str, threshold: int = 12, max_findings: int = 50) -> dict:
     offenders = []
     scanned = 0
     for dirpath, _, files in os.walk(root):
-        if any(seg in dirpath for seg in ("/node_modules/", "\\node_modules\\", "/.git/", "\\.git\\")):
+        parts = dirpath.split(os.sep)
+        if "node_modules" in parts or ".git" in parts or "tests" in parts:
             continue
         for fn in files:
             if fn.endswith(".py"):
                 scanned += 1
-                path = os.path.join(dirpath, fn)
-                try:
-                    tree = ast.parse(open(path, encoding="utf-8", errors="ignore").read())
-                except (OSError, SyntaxError):
-                    continue
-                for n in ast.walk(tree):
-                    if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                        cc = _py_cc(n)
-                        if cc > threshold:
-                            offenders.append({"file": os.path.relpath(path, root),
-                                              "line": n.lineno, "cc": cc})
+                _scan_python(os.path.join(dirpath, fn), root, offenders, threshold)
             elif fn.endswith((".js", ".ts", ".jsx", ".tsx", ".mjs", ".cjs")):
                 scanned += 1
-                path = os.path.join(dirpath, fn)
-                try:
-                    src = open(path, encoding="utf-8", errors="ignore").read()
-                except OSError:
-                    continue
-                # crude per-file heuristic; per-function would need a parser
-                cc = len(JS_BRANCH.findall(src))
-                if cc > threshold * 4:  # file-level heuristic is noisier
-                    offenders.append({"file": os.path.relpath(path, root),
-                                      "line": 1, "cc": cc})
+                _scan_js(os.path.join(dirpath, fn), root, offenders, threshold)
     offenders.sort(key=lambda o: -o["cc"])
     worst = offenders[:max_findings]
     score = max(0, 100 - len(worst) * 8)

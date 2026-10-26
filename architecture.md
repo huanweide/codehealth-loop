@@ -40,16 +40,26 @@
 
 **概念**：代码不是"对/错"二值，而是 12 个正交的健康维度。每层轴是一个**零依赖、离线、确定性**的静态探针，输出 `{passed, score, findings, evidence}`。
 
-**已实现的 3 轴（真实可跑，`judges/`）：**
-| Axis | 名称 | 真实实现 | 探针逻辑 |
-|---|---|---|---|
-| 4 | CycScan | `judges/cycscan.py` | Python 用 `ast` 数决策点；JS/TS 用分支关键字启发式 |
-| 7 | SecScan | `judges/secscan.py` | 正则扫危险调用（`eval`/`exec`/`child_process`/`innerHTML=`/拼接 SQL） |
-| 9 | DupScan | `judges/dupscan.py` | 4 行块归一化哈希，统计跨文件重复率 |
+**已实现的 12 轴（全部真实可跑，`judges/` 下零依赖、离线、确定性）：**
 
-**可插拔的 9 轴（路线图）**：直接复用 `doctors` 家族的 12 个零依赖 CLI（a11y/commit/dev/doc/pkg/rel/repo/type/test/lit/debug/debt/await/chaineye/idiot/lic/gha），每个抽成 `judges/<name>.py` 的 `evaluate(root)` 接口即可。
+| # | 名称 | 文件 | 探针逻辑 | 依赖 |
+|---|---|---|---|---|
+| 1 | RepoDoctor | `judges/repodoctor.py` | 仓库卫生：跟踪中 `.env`、明文密钥、超大文件、缺 LICENSE/README/锁文件 | 文件系统 |
+| 2 | CommitDoctor | `judges/commitdoctor.py` | 提交消息规范：主题尾部标点/空格、TODO 标记、疑似密钥 | git（无 git→不适用） |
+| 3 | DevDoctor | `judges/devdoctor.py` | 源码明文密钥、依赖胖瘦（直接依赖数）、许可证分类（强/弱/宽松） | 文件系统 |
+| 4 | CycScan | `judges/cycscan.py` | Python 用 `ast` 数决策点；JS/TS 用分支关键字启发式 | 文件系统 |
+| 5 | DocDoctor | `judges/docdoctor.py` | Markdown：图片缺 alt、裸 URL、标题跳级、坏锚点 | 文件系统 |
+| 6 | PkgDoctor | `judges/pkgdoctor.py` | package.json：缺/非法 semver、缺 license、模糊依赖范围、非 registry 依赖 | 文件系统 |
+| 7 | SecScan | `judges/secscan.py` | 危险调用（`eval`/`exec`/`child_process`/`innerHTML=`/拼接 SQL）；扫描前剥离字符串与注释（dogfood 纪律） | 文件系统 |
+| 8 | RelDoctor | `judges/reldoctor.py` | 发布卫生：version / git tag / CHANGELOG 三者一致性 | git（无 git→人工核对） |
+| 9 | DupScan | `judges/dupscan.py` | 4 行块归一化哈希，统计跨文件重复率 | 文件系统 |
+| 10 | TypeDoctor | `judges/typedoctor.py` | 类型纪律：explicit-any / any-cast / ts-ignore 注释（跳过 `.d.ts`、字符串、正则） | 文件系统 |
+| 11 | A11yDoctor | `judges/a11ydoctor.py` | 可访问性：`<img>` 缺 alt、表单控件无名、标题跳级、废弃标签、可点击 div 无键盘事件 | 文件系统 |
+| 12 | EngHealth | `judges/enghealth.py` | 过程成熟度（建议轴，不硬卡）：LICENSE/README/CI/自测 信号覆盖 | 文件系统 |
 
-**接口契约**：
+> 注：`CommitDoctor` / `RelDoctor` 是 **git 感知**的——仓库无 git 历史时如实降级为"不适用/人工核对"，绝不伪造通过。所有轴继承 `doctors` 家族的 dogfood 纪律：**不误伤字符串字面量、注释、正则源文本**（SecScan / TypeDoctor 已实现剥离）。
+
+**接口契约**（每个 judge 模块导出 `evaluate(root) -> dict`）：
 ```python
 def evaluate(root: str) -> dict:
     return {"axis": int, "name": str, "passed": bool,

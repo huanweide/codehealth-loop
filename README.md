@@ -39,11 +39,19 @@ AI 写得动代码，但有三个系统性毛病：
 
 ```mermaid
 flowchart TB
-    subgraph PL["PerceptionLayer · 感知层 (12 Health Axes)"]
-        A1[Axis 4 · CycScan 圈复杂度]
-        A2[Axis 7 · SecScan 安全反模式]
-        A3[Axis 9 · DupScan 重复代码]
-        A4[... 9 轴可插拔]
+    subgraph PL["PerceptionLayer · 感知层 (12 Health Axes · 全部已落地)"]
+        A0[1 RepoDoctor 仓库卫生]
+        A1[2 CommitDoctor 提交规范]
+        A2[3 DevDoctor 依赖·密钥·许可证]
+        A3[4 CycScan 圈复杂度]
+        A4[5 DocDoctor 文档健康]
+        A5[6 PkgDoctor 包元数据]
+        A6[7 SecScan 安全反模式]
+        A7[8 RelDoctor 发布卫生]
+        A8[9 DupScan 重复代码]
+        A9[10 TypeDoctor 类型纪律]
+        A10[11 A11yDoctor 可访问性]
+        A11[12 EngHealth 过程成熟度]
     end
     subgraph AM["AdversarialMatrix · 评审矩阵 (7-Mind Collision)"]
         B1[Munger / Musk / Feynman / Taleb / Zhang / Linus / Carmack]
@@ -98,29 +106,32 @@ python engine.py ./your-project
 python engine.py ./your-project --max-rounds 8
 ```
 
-真实运行示例（对含缺陷的样例跑，输出有真实 `file:line` 证据；第 1 轮即收敛，不再空转）：
+真实运行示例：引擎对自身源码跑一轮闭环（`python engine.py .`），12 轴全部真实跑通、输出真实证据，并通过判别测试 —— 工具严于律己：
 
 ```
-── Round 1 · health=89 · strategy=standard ──
-  • [DupScan] axis9 root-cause @ sample_dirty.py:14 — see findings
-  • [SecScan] axis7 root-cause @ sample_dirty.py:11 — see findings
 ══════ DELIVERY (evidence-anchored) ══════
 {
-  "health_score": 89,
-  "verdict": "CONVERGED: 1 axis(s) proven fixable in sandbox (NOT auto-applied); remaining need manual review",
+  "round": 1,
+  "health_score": 97,
+  "verdict": "ALL GREEN + discrimination test passed",
   "axes": [
-    {"name":"CycScan","passed":true,"score":100,"evidence":"scanned 2 files, 0 funcs over threshold(>12)"},
-    {"name":"DupScan","passed":false,"score":80,"evidence":"2 files, dup-ratio=10.00% (thresh 5%), 1 dup blocks"},
-    {"name":"SecScan","passed":false,"score":88,"evidence":"scanned 2 files, 1 hits (1 high)"}
-  ],
-  "fix_candidates": [
-    {"axis":"SecScan","file":"sample_dirty.py","line":11,"verified_green":true,
-     "suggestion":"Replace `eval(...)` with an explicit, whitelisted parser (ast.literal_eval / json.loads / a typed decoder)..."}
+    {"name":"RepoDoctor","passed":true,"score":100,"evidence":"scanned N files; 0 finding(s); has-license=y; has-readme=y"},
+    {"name":"CommitDoctor","passed":true,"score":100,"evidence":"no git history — commit-message hygiene not applicable (manual)"},
+    {"name":"DevDoctor","passed":true,"score":100,"evidence":"... 0 finding(s); dependency-cycles=MANUAL"},
+    {"name":"CycScan","passed":true,"score":100,"evidence":"scanned N files, 0 funcs over threshold(>12)"},
+    {"name":"DocDoctor","passed":true,"score":90,"evidence":"scanned 1 Markdown file(s); 0 finding(s)"},
+    {"name":"PkgDoctor","passed":true,"score":100,"evidence":"no package.json in scope — axis not applicable"},
+    {"name":"SecScan","passed":true,"score":100,"evidence":"scanned N files, 0 hits (0 high)"},
+    {"name":"RelDoctor","passed":true,"score":100,"evidence":"RelDoctor: version=None; 0 finding(s)"},
+    {"name":"DupScan","passed":true,"score":92,"evidence":"... dup-ratio=0.00% (thresh 5%), 0 dup blocks"},
+    {"name":"TypeDoctor","passed":true,"score":100,"evidence":"scanned 0 TS/JS file(s); 0 type-smell(s)"},
+    {"name":"A11yDoctor","passed":true,"score":100,"evidence":"scanned 0 file(s); 0 a11y finding(s)"},
+    {"name":"EngHealth","passed":true,"score":96,"evidence":"EngHealth process signals: LICENSE=y, README=y, CI=n, tests=n"}
   ]
 }
---- fix candidates (sandbox-verified, NOT auto-applied) ---
-  [SecScan] sample_dirty.py:11 -> VERIFIED-GREEN (sandbox)
 ```
+
+> 注入样例（带 `eval` 的脏文件）时，引擎第 1 轮即 `CONVERGED`：`Healer` 在沙箱副本上清空该行并重跑 `SecScan`，证明变绿 → 标 `verified_green` 交付，**绝不自动改你的代码**。无机械可验证修复的结构性问题（如高圈复杂度）则标 `manual` 诚实移交人工。
 
 > 闭环不是空谈：引擎发现红轴 → `Healer` 生成修复候选 → 在**沙箱副本**上重跑该轴，证明"移除该危险调用确实让轴变绿"（判别测试锁死）→ 交付已验证的修复补丁。**它绝不自动改你的代码**（符合 `forge-safeguard` 安全精神），只把"经证明有效的修复"交给你/上层 agent 落地。若无可机械验证的修复（如高圈复杂度需重构），则标 `manual` 并诚实移交人工。
 
@@ -131,9 +142,8 @@ python engine.py ./your-project --max-rounds 8
 | 层 | 状态 | 说明 |
 |---|---|---|
 | BrakeCore 四道刹车 | ✅ 已实现 | `engine.py` 真实跑通 |
-| PerceptionLayer · CycScan / SecScan / DupScan | ✅ 已实现（3 轴） | `judges/` 下真实静态分析 |
-| PerceptionLayer · 其余 9 轴 | 🔜 可插拔 | 把 `doctors` 家族 12 叶子的检查逻辑抽成 judge 插件 |
-| **Healer Layer（修复候选 + 沙箱验证）** | ✅ **已实现（本次升级）** | `healer.py`：生成修复候选 → 沙箱副本重跑判据证明变绿 → 交付；绝不自动改用户代码 |
+| PerceptionLayer · **全部 12 轴** | ✅ **已实现（本次合成）** | `judges/` 下 12 个真实静态探针：`doctors` 8 轴（Repo/Commit/Dev/Doc/Pkg/Rel/Type/A11y）+ SecScan/CycScan/DupScan 3 轴 + EngHealth 过程轴；零依赖、离线、确定性，继承 dogfood 纪律（不误伤字符串/注释/正则） |
+| **Healer Layer（修复候选 + 沙箱验证）** | ✅ **已实现** | `healer.py`：生成修复候选 → 沙箱副本重跑判据证明变绿 → 交付；绝不自动改用户代码 |
 | AdversarialMatrix 7 视角 | 🔜 接口预留 | 接入 `advverify` 的多视角评审作为 R/C/N 的对抗输入 |
 | GuardrailLayer | 🔜 接口预留 | 接入 `forge-safeguard` 拦截修复时的破坏性命令 |
 | 自动落地修复到用户代码 | ❌ 不提供（安全铁律） | 引擎只交付"经沙箱验证的修复候选"，落地由上层 agent/人执行，二者解耦 |
@@ -143,7 +153,7 @@ python engine.py ./your-project --max-rounds 8
 ## 与兄弟项目的关系
 
 - **maxloop-overlord**：本引擎的 BrakeCore 即其四道刹车的 Python 实现。它是"通用迭代质量引擎"，本仓库是它在"代码健康"这一垂直场景的具象化。
-- **doctors**：本引擎的 PerceptionLayer 来源。它的 12 个独立零依赖 CLI 将作为**判据插件**被本引擎统一调度（而非各自散落 0★ 仓库）。
+- **doctors**：本引擎的 PerceptionLayer 来源。它的 8 个零依赖 doctor（`repo/commit/dev/doc/pkg/rel/type/a11y`）检查逻辑已**忠实移植**为 `judges/` 下的 Python 探针（第 1/2/3/5/6/8/10/11 轴）；原散落的 9 个独立叶子仓（cycscan/dupscan/secscan/debtlens/debugdoctor/ghadoctor/litdoctor/enghealth/family-showcase）因已被本引擎覆盖，已**归档**到 `gh-optimizer/_archive/`（可逆，不删除），不再各自 0★ 散落。
 - **advverify / forge-safeguard**：分别提供"对抗评审视角"与"执行护栏"，作为可插拔模块。
 
 ---
