@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+"""codehealth-loop · Engineering Health Self-Healing Engine (Brake Core).
+
+Synthesis of four real assets into one systematic loop:
+
+  BrakeCore          <- maxloop-overlord  (four brakes: R/C/N+root-cause,
+                                            Oracle Gate+evidence anchor,
+                                            discrimination test, escape ladder+stall guard)
+  PerceptionLayer    <- doctors 12 health axes (3 implemented & real: SecScan /
+                                            CycScan / DupScan; 9 pluggable)
+  AdversarialMatrix  <- advverify 7-mind collision (interface reserved, roadmap)
+  GuardrailLayer     <- forge-safeguard destructive-command intercept (interface)
+
+The loop never claims "done" on its own authority. A round is delivered ONLY
+when every Perception axis is green AND the discrimination test confirms the
+previous red is now green (old-red/new-green). Every verdict is anchored to
+real file:line evidence — no evidence, no verdict.
+"""
+from __future__ import annotations
+import importlib.util
+import os
+import sys
+import json
+
+# ---------------------------------------------------------------------------
+# Perception Layer — pluggable health axes
+# ---------------------------------------------------------------------------
+class PerceptionLayer:
+    def __init__(self, judges_dir: str):
+        self.judges = []
+        for fn in sorted(os.listdir(judges_dir)):
+            if fn.endswith(".py") and not fn.startswith("_"):
+                spec = importlib.util.spec_from_file_location(
+                    fn[:-3], os.path.join(judges_dir, fn))
+                mod = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(mod)
+                if hasattr(mod, "evaluate"):
+                    self.judges.append(mod)
+
+    def sweep(self, root: str) -> list[dict]:
+        return [j.evaluate(root) for j in self.judges]
+
+
+# ---------------------------------------------------------------------------
+# Brake Core — maxloop four brakes
+# ---------------------------------------------------------------------------
+class BrakeCore:
+    def __init__(self, stall_patience: int = 3, escape_after: int = 4):
+        self.stall_patience = stall_patience
+        self.escape_after = escape_after
+
+    def oracle_gate(self, results: list[dict]) -> tuple[bool, list[dict]]:
+        """Oracle Gate + evidence anchor: pass only if every axis green AND
+        each verdict carries real evidence. Returns (passed, red_axes)."""
+        red = [r for r in results if not r["passed"]]
+        for r in results:
+            if not r.get("evidence"):
+                red.append({**r, "missing_evidence": True})
+        return (len(red) == 0, red)
+
+    def root_cause_gate(self, red_axes: list[dict]) -> list[str]:
+        """R/C/N + root-cause gate: collapse red axes into actionable root
+        causes, each anchored to file:line evidence (never a vibe)."""
+        causes = []
+        for ax in red_axes:
+            if ax.get("findings"):
+                top = ax["findings"][0]
+                # SecScan/others use file:line; DupScan uses locations["file:line"]
+                if "file" in top and "line" in top:
+                    loc, ln = top["file"], top["line"]
+                elif top.get("locations"):
+                    first = top["locations"][0].split(":")
+                    loc, ln = (first[0], first[1]) if len(first) > 1 else (first[0], "?")
+                else:
+                    loc, ln = "?", "?"
+                causes.append(f"[{ax['name']}] axis{ax.get('axis','?')} "
+                              f"root-cause @ {loc}:{ln} — {ax.get('why', 'see findings')}")
+            else:
+                causes.append(f"[{ax['name']}] axis{ax.get('axis','?')} — no detail")
+        return causes
+
+    def discrimination_test(self, prev: list[dict] | None, now: list[dict]) -> bool:
+        """Old-red/new-green: deliver only if a previously red axis is now green
+        (or all were already green from the start)."""
+        if prev is None:
+            return all(r["passed"] for r in now)
+        prev_by = {r["name"]: r["passed"] for r in prev}
+        for r in now:
+            was_red = not prev_by.get(r["name"], True)
+            if was_red and not r["passed"]:
+                return False
+        return True
+
+
+# ---------------------------------------------------------------------------
+# Convergence Protocol — escape ladder + stall guard
+# ---------------------------------------------------------------------------
+class ConvergenceProtocol:
+    def __init__(self):
+        self.history: list[int] = []
+
+    def stall_guard(self, current_score: int, patience: int) -> bool:
+        """Brake if health score has not improved for `patience` rounds."""
+        self.history.append(current_score)
+        if len(self.history) <= patience:
+            return False
+        window = self.history[-(patience + 1):]
+        return max(window[:-1]) >= window[-1]
+
+    def escape_ladder(self, round_no: int, after: int) -> str:
+        """Escalate strategy once stuck past `after` rounds."""
+        if round_no < after:
+            return "standard"
+        if round_no < after + 2:
+            return "deepen: widen scan scope + lower noise threshold"
+        return "escalate: hand actionable report to human/agent (stop self-spin)"
+
+
+# ---------------------------------------------------------------------------
+# Self-healing loop
+# ---------------------------------------------------------------------------
+def run_loop(root: str, max_rounds: int = 6) -> dict:
+    here = os.path.dirname(os.path.abspath(__file__))
+    percept = PerceptionLayer(os.path.join(here, "judges"))
+    brake = BrakeCore()
+    conv = ConvergenceProtocol()
+    prev = None
+    for rnd in range(1, max_rounds + 1):
+        results = percept.sweep(root)
+        health = sum(r["score"] for r in results) // len(results) if results else 0
+        passed, red = brake.oracle_gate(results)
+        strategy = conv.escape_ladder(rnd, brake.escape_after)
+        if passed:
+            if brake.discrimination_test(prev, results):
+                return _deliver(rnd, health, results, "ALL GREEN + discrimination test passed", strategy)
+            prev = results
+            continue
+        causes = brake.root_cause_gate(red)
+        stalled = conv.stall_guard(health, brake.stall_patience)
+        if stalled:
+            return _deliver(rnd, health, results, "STALL GUARD tripped — stop self-spin, report to human", strategy, causes)
+        # not delivered this round: surface evidence-anchored root causes
+        print(f"\n── Round {rnd} · health={health} · strategy={strategy} ──")
+        for c in causes[:12]:
+            print("  •", c)
+        prev = results
+    return _deliver(max_rounds, health, results, "MAX ROUNDS reached — deliver evidence report", strategy, causes)
+
+
+def _deliver(round_no, health, results, verdict, strategy, causes=None) -> dict:
+    report = {
+        "round": round_no, "health_score": health, "verdict": verdict,
+        "strategy": strategy, "axes": [
+            {"name": r["name"], "axis": r.get("axis"), "passed": r["passed"],
+             "score": r["score"], "evidence": r.get("evidence")}
+            for r in results
+        ],
+        "root_causes": causes or [],
+    }
+    print("\n════════ DELIVERY (evidence-anchored) ════════")
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    return report
+
+
+if __name__ == "__main__":
+    target = sys.argv[1] if len(sys.argv) > 1 else "."
+    run_loop(target)
