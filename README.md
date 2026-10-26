@@ -98,26 +98,31 @@ python engine.py ./your-project
 python engine.py ./your-project --max-rounds 8
 ```
 
-真实运行示例（对含缺陷的样例跑，输出有真实 `file:line` 证据）：
+真实运行示例（对含缺陷的样例跑，输出有真实 `file:line` 证据；第 1 轮即收敛，不再空转）：
 
 ```
 ── Round 1 · health=89 · strategy=standard ──
   • [DupScan] axis9 root-cause @ sample_dirty.py:14 — see findings
   • [SecScan] axis7 root-cause @ sample_dirty.py:11 — see findings
-...
 ══════ DELIVERY (evidence-anchored) ══════
 {
   "health_score": 89,
-  "verdict": "STALL GUARD tripped — stop self-spin, report to human",
+  "verdict": "CONVERGED: 1 axis(s) proven fixable in sandbox (NOT auto-applied); remaining need manual review",
   "axes": [
     {"name":"CycScan","passed":true,"score":100,"evidence":"scanned 2 files, 0 funcs over threshold(>12)"},
     {"name":"DupScan","passed":false,"score":80,"evidence":"2 files, dup-ratio=10.00% (thresh 5%), 1 dup blocks"},
     {"name":"SecScan","passed":false,"score":88,"evidence":"scanned 2 files, 1 hits (1 high)"}
+  ],
+  "fix_candidates": [
+    {"axis":"SecScan","file":"sample_dirty.py","line":11,"verified_green":true,
+     "suggestion":"Replace `eval(...)` with an explicit, whitelisted parser (ast.literal_eval / json.loads / a typed decoder)..."}
   ]
 }
+--- fix candidates (sandbox-verified, NOT auto-applied) ---
+  [SecScan] sample_dirty.py:11 -> VERIFIED-GREEN (sandbox)
 ```
 
-> 注意：当前引擎是**诊断 + 收敛 + 证据交付**。自动修复（agent 接 BrakeCore 真去改代码）是路线图 —— 引擎负责"判据真绿才停"，修复动作由上层 agent 在拿到证据报告后执行，二者通过统一接口解耦。
+> 闭环不是空谈：引擎发现红轴 → `Healer` 生成修复候选 → 在**沙箱副本**上重跑该轴，证明"移除该危险调用确实让轴变绿"（判别测试锁死）→ 交付已验证的修复补丁。**它绝不自动改你的代码**（符合 `forge-safeguard` 安全精神），只把"经证明有效的修复"交给你/上层 agent 落地。若无可机械验证的修复（如高圈复杂度需重构），则标 `manual` 并诚实移交人工。
 
 ---
 
@@ -128,9 +133,10 @@ python engine.py ./your-project --max-rounds 8
 | BrakeCore 四道刹车 | ✅ 已实现 | `engine.py` 真实跑通 |
 | PerceptionLayer · CycScan / SecScan / DupScan | ✅ 已实现（3 轴） | `judges/` 下真实静态分析 |
 | PerceptionLayer · 其余 9 轴 | 🔜 可插拔 | 把 `doctors` 家族 12 叶子的检查逻辑抽成 judge 插件 |
+| **Healer Layer（修复候选 + 沙箱验证）** | ✅ **已实现（本次升级）** | `healer.py`：生成修复候选 → 沙箱副本重跑判据证明变绿 → 交付；绝不自动改用户代码 |
 | AdversarialMatrix 7 视角 | 🔜 接口预留 | 接入 `advverify` 的多视角评审作为 R/C/N 的对抗输入 |
 | GuardrailLayer | 🔜 接口预留 | 接入 `forge-safeguard` 拦截修复时的破坏性命令 |
-| 自动修复闭环 | 🔜 路线图 | 上层 agent 消费证据报告 → 改代码 → 再跑引擎 |
+| 自动落地修复到用户代码 | ❌ 不提供（安全铁律） | 引擎只交付"经沙箱验证的修复候选"，落地由上层 agent/人执行，二者解耦 |
 
 ---
 

@@ -46,9 +46,12 @@ python engine.py /path/to/project --max-rounds 8
          · 否则继续（记录 prev）
   4. 若红：
        - BrakeCore.root_cause_gate(red) ⇒ 带 file:line 的根因清单
+       - Healer.propose(red, percept.by_name, root) ⇒ 生成修复候选 + **沙箱副本验证变绿**
+         · 有 `verified_green` 候选 ⇒ DELIVER("CONVERGED: N axis proven fixable")  # 闭环收敛
+         · 无机械可验证修复 ⇒ 继续
        - ConvergenceProtocol.escape_ladder(round) ⇒ 策略升级
        - ConvergenceProtocol.stall_guard(health) ⇒ 触发则 DELIVER(交人)
-       - Agent 依据根因清单修复代码 ⇒ 下一轮
+       - Agent 依据根因清单 + 修复候选修复代码 ⇒ 下一轮
 ```
 
 ---
@@ -59,7 +62,8 @@ python engine.py /path/to/project --max-rounds 8
 - **AdversarialMatrix（评审）**：多心智模型碰撞，标"共识级必改项"（路线图接口）。
 - **GuardrailLayer（护栏）**：自动修复执行前拦截破坏性命令（路线图接口）。
 - **BrakeCore（刹车）**：判敛灵魂，决定"能不能说改好了"。
-- **Agent（你）**：消费证据根因清单 → 真去改代码 → 触发下一轮。
+- **Healer（修复候选）**：对红轴生成修复候选，并在沙箱副本上验证其确实让轴变绿；**绝不改用户代码**，只交付"经验证的补丁"。
+- **Agent（你）**：消费证据根因清单 + 修复候选 → 真去改代码（或采纳候选）→ 触发下一轮。
 
 ---
 

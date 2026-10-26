@@ -97,6 +97,20 @@ def evaluate(root: str) -> dict:
 
 ---
 
+## 4.5 Healer Layer · 修复候选生成 + 沙箱验证（闭环的关键）
+
+**概念**：BrakeCore 之前只"判红 + 报告"，遇到真缺陷会一直重扫直到 stall guard 刹车——那是**开环**，与"self-healing"名不副实。Healer 把循环补成**闭环**：对每条红轴 finding 生成修复候选，并在**沙箱副本**上重跑对应判据，证明"移除该危险构造确实让轴变绿"（判别测试锁死），再交付"经验证的修复补丁"。
+
+**安全铁律**：Healer **绝不修改用户的真实代码**（继承 `forge-safeguard` 精神）。它只在 `tempfile` 副本上验证、验证完即删；交付的是候选 + 验证证据，落地由上层 agent / 人执行。
+
+**真实代码**：`healer.py` 的 `propose(red_axes, by_name, root)` + `sandbox_verify_fix(...)`。
+- `SecScan`（危险调用可注释化）→ 沙箱验证可转绿 → 标 `verified_green`
+- `CycScan` / `DupScan`（结构性问题需重构）→ 标 `manual`，诚实移交人工
+
+> 这恰好是 maxloop 0.4 脊柱的"改 → 测 → 收敛"：Healer 负责"改（候选）+ 测（沙箱验证）"，BrakeCore 负责"收敛判定"。
+
+---
+
 ## 5. 数据流（一轮迭代）
 
 ```
@@ -106,9 +120,14 @@ def evaluate(root: str) -> dict:
      BrakeCore.discrimination_test(prev, results) → 全绿且旧红转绿 ⇒ DELIVER
    else:
      causes = BrakeCore.root_cause_gate(red_axes)  # 带 file:line 证据
-     strategy = ConvergenceProtocol.escape_ladder(round)
-     if ConvergenceProtocol.stall_guard(health): DELIVER(w/ "STALL GUARD")
-     else: 打印证据根因 → 上层 agent 据此修复 → 下一轮
+     fixes  = Healer.propose(red_axes, percept.by_name, root)  # 生成+沙箱验证修复候选
+     verified = [f for f in fixes if f.verified_green]
+     if verified:
+         DELIVER("CONVERGED: N axis(s) proven fixable in sandbox")  # 闭环收敛，不空转
+     elif ConvergenceProtocol.stall_guard(health):
+         DELIVER("STALL GUARD")  # 无可机械验证修复 → 交人
+     else:
+         打印证据根因 + 修复候选 → 上层 agent 据此修复 → 下一轮
 ```
 
 ---

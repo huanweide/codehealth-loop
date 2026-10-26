@@ -21,6 +21,10 @@ import importlib.util
 import os
 import sys
 import json
+import tempfile
+import shutil
+
+import healer  # Healer Layer: fix-candidate synthesis + sandbox verification
 
 # ---------------------------------------------------------------------------
 # Perception Layer — pluggable health axes
@@ -28,6 +32,7 @@ import json
 class PerceptionLayer:
     def __init__(self, judges_dir: str):
         self.judges = []
+        self.by_name = {}  # axis name -> module (for targeted sandbox re-runs)
         for fn in sorted(os.listdir(judges_dir)):
             if fn.endswith(".py") and not fn.startswith("_"):
                 spec = importlib.util.spec_from_file_location(
@@ -36,6 +41,13 @@ class PerceptionLayer:
                 spec.loader.exec_module(mod)
                 if hasattr(mod, "evaluate"):
                     self.judges.append(mod)
+                    probe = tempfile.mkdtemp()
+                    try:
+                        nm = mod.evaluate(probe).get("name")
+                        if nm:
+                            self.by_name[nm] = mod
+                    finally:
+                        shutil.rmtree(probe, ignore_errors=True)
 
     def sweep(self, root: str) -> list[dict]:
         return [j.evaluate(root) for j in self.judges]
@@ -136,18 +148,28 @@ def run_loop(root: str, max_rounds: int = 6) -> dict:
             prev = results
             continue
         causes = brake.root_cause_gate(red)
+        # Healer: propose + sandbox-verify fixes; converge on a *verified* fix
+        # existing (maxloop: change -> test -> converge), never on silent mutation.
+        fixes = healer.propose(red, percept.by_name, root)
+        verified = [f for f in fixes if f.get("verified_green")]
+        if verified:
+            return _deliver(
+                rnd, health, results,
+                f"CONVERGED: {len(verified)} axis(s) proven fixable in sandbox "
+                f"(NOT auto-applied); remaining need manual review",
+                strategy, causes, fixes)
         stalled = conv.stall_guard(health, brake.stall_patience)
         if stalled:
-            return _deliver(rnd, health, results, "STALL GUARD tripped — stop self-spin, report to human", strategy, causes)
+            return _deliver(rnd, health, results, "STALL GUARD tripped — stop self-spin, report to human", strategy, causes, fixes)
         # not delivered this round: surface evidence-anchored root causes
         print(f"\n── Round {rnd} · health={health} · strategy={strategy} ──")
         for c in causes[:12]:
             print("  •", c)
         prev = results
-    return _deliver(max_rounds, health, results, "MAX ROUNDS reached — deliver evidence report", strategy, causes)
+    return _deliver(max_rounds, health, results, "MAX ROUNDS reached — deliver evidence report", strategy, causes, fixes)
 
 
-def _deliver(round_no, health, results, verdict, strategy, causes=None) -> dict:
+def _deliver(round_no, health, results, verdict, strategy, causes=None, fixes=None) -> dict:
     report = {
         "round": round_no, "health_score": health, "verdict": verdict,
         "strategy": strategy, "axes": [
@@ -156,9 +178,22 @@ def _deliver(round_no, health, results, verdict, strategy, causes=None) -> dict:
             for r in results
         ],
         "root_causes": causes or [],
+        "fix_candidates": fixes or [],
     }
     print("\n════════ DELIVERY (evidence-anchored) ════════")
     print(json.dumps(report, ensure_ascii=False, indent=2))
+    if fixes:
+        print("--- fix candidates (sandbox-verified, NOT auto-applied) ---")
+        for fx in fixes[:12]:
+            if fx.get("verified_green"):
+                tag = "VERIFIED-GREEN (sandbox)"
+            elif not fx.get("verifiable"):
+                tag = "manual (needs human refactor)"
+            else:
+                tag = "UNVERIFIED"
+            print(f"  [{fx['axis']}] {fx['file']}:{fx['line']} -> {tag}")
+            print(f"     why: {fx['why']}")
+            print(f"     fix: {fx['suggestion']}")
     return report
 
 
