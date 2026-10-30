@@ -243,7 +243,7 @@ def run(root):
 | [`maxloop-overlord`](https://github.com/huanweide/maxloop-overlord) | Agent Skill | 范式本体：BrakeCore 四道刹车就来自它 |
 | [`codehealth-loop`](https://github.com/huanweide/codehealth-loop) | Python 引擎（本仓库） | 范式在"工程健康"垂直场景的具象化 |
 | [`veriloop`](https://github.com/huanweide/veriloop) | Python CLI | 范式在"代码审计"场景的具象化：12 分析轴 + 4 道验证刹车 |
-| [`overlord-loop`](https://github.com/huanweide/overlord-loop) | 引擎实现 | 魔王系统：带刹车的 AI 代码进化引擎 |
+| [`overlord-loop`](https://github.com/huanweide/overlord-loop) | 引擎实现 | 带刹车的 AI 代码进化闭环引擎 |
 | [`doctors`](https://github.com/huanweide/doctors) | Node CLI 全家桶 | 本引擎感知层 8 个轴的来源，逻辑已忠实移植为 Python 探针 |
 | [`family-showcase`](https://github.com/huanweide/family-showcase) | 单页 HTML | 工程健康家族 18 轴全景仪表盘 |
 
