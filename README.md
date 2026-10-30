@@ -1,3 +1,5 @@
+**English** · [README_EN.md](./README_EN.md)
+
 <p align="center">
   <img src="assets/banner.svg" alt="codehealth-loop · 工程健康自愈引擎" width="1280">
 </p>
